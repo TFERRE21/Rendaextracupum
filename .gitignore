@@ -1,8 +1,57 @@
+# Dependências
 node_modules/
+
+# Build
 dist/
-coverage/
+*.tsbuildinfo
+src/generated/
+
+# Prisma
+/prisma/dev.db
+/prisma/*.db
+
+# Config sensível (tokens, senhas, IDs de afiliado)
+config/.env
 .env
-.env.*
-!.env.example
+.env.local
+.env.*.local
+*.local
+
+# Sessão WhatsApp (dados de autenticação)
+whatsapp-session/
+.wwebjs_auth/
+.wwebjs_cache/
+whatsapp-qr.png
+
+# Scripts locais de desenvolvimento (não versionados)
+scripts/*.ps1
+
+# Banco de dados (dados reais de ofertas)
+data/*
+!data/.gitkeep
+**/*.db
+
+# Logs
+logs/
+
+# Arquivos temporários do OpenCode
+.tmp/
+.omc/
+.omo/
+
+# Graphify output (gerado automaticamente)
+graphify-out/
+
+# Cobertura de testes
+coverage/
+
+# Sistema
 .DS_Store
+Thumbs.db
 *.log
+
+# KiloCode workspace local
+.kilo/
+
+#PostLK
+linkedin-post.md

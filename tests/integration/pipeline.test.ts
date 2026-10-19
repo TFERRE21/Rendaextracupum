@@ -1,0 +1,113 @@
+/**
+ * Teste de integração E2E — pipeline completo.
+ *
+ * Simula o fluxo: mensagem WhatsApp mock → processOffer → database
+ *
+ * NOTA: Depende de tokens para testar afiliados (AMAZON_AFFILIATE_TAG)
+ * e Telegram (TELEGRAM_BOT_TOKEN). Sem tokens, testa até onde possível.
+ *
+ * O banco usado é LOCAL (SQLite via libSQL `file:` URL), preparado por
+ * tests/setup.ts — não depende do Turso remoto.
+ */
+
+import { getRecentOffers, getStats } from "../../src/database/offers";
+import { processOffer } from "../../src/processor";
+import { waitForTestDb } from "../helpers/local-db";
+
+// Unique suffix for each test run to avoid duplicates
+const TEST_RUN_ID = Date.now().toString(36);
+
+beforeAll(async () => {
+  await waitForTestDb();
+});
+
+describe("Pipeline de Integração", () => {
+  it("processa oferta Amazon do início ao DB", async () => {
+    const msg = `🔥 OFERTA EXCLUSIVA
+iPhone 14 Pro Max 256GB
+De R$ 7.499 por R$ 3.749
+50% OFF
+https://www.amazon.com.br/dp/B0BJLXMVMV_${TEST_RUN_ID}`;
+
+    const result = await processOffer(
+      msg,
+      `https://www.amazon.com.br/dp/B0BJLXMVMV_${TEST_RUN_ID}`
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.offer).toBeDefined();
+    expect(result.offer!.name).toBeDefined();
+    expect(result.offer!.platform).toBe("amazon");
+  }, 15000);
+
+  it("rejeita oferta duplicada", async () => {
+    // URL de plataforma desconhecida → sem link de afiliado → o campo url
+    // do banco preserva a URL original, permitindo o dedup por URL.
+    const url = `https://example.com/produto/123_${TEST_RUN_ID}`;
+    const msg = `Produto Duplicata ${TEST_RUN_ID}
+De R$ 100 por R$ 50
+${url}`;
+
+    const first = await processOffer(msg, url);
+    expect(first.success).toBe(true);
+
+    const result = await processOffer(msg, url);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("duplicate");
+  }, 15000);
+
+  it("processa oferta AliExpress", async () => {
+    const msg = `⚡ OFERTA RELÂMPAGO
+Smartwatch X100
+De R$ 299 por R$ 149
+https://www.aliexpress.com/item/100500384912345_${TEST_RUN_ID}.html`;
+
+    const result = await processOffer(
+      msg,
+      `https://www.aliexpress.com/item/100500384912345_${TEST_RUN_ID}.html`
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.offer).toBeDefined();
+  }, 15000);
+
+  it("processa oferta Shopee", async () => {
+    const msg = `Fone Bluetooth
+De R$ 199 por R$ 89
+https://shopee.com.br/product/111/222_${TEST_RUN_ID}`;
+
+    const result = await processOffer(
+      msg,
+      `https://shopee.com.br/product/111/222_${TEST_RUN_ID}`
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.offer!.platform).toBe("shopee");
+  });
+
+  it("processa oferta Mercado Livre", async () => {
+    const msg = `Notebook Dell
+De R$ 4.999 por R$ 3.499
+https://www.mercadolivre.com.br/produto/98765_${TEST_RUN_ID}`;
+
+    const result = await processOffer(
+      msg,
+      `https://www.mercadolivre.com.br/produto/98765_${TEST_RUN_ID}`
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.offer!.platform).toBe("mercadolivre");
+  }, 15000);
+
+  it("registra todas as ofertas no banco", async () => {
+    const offers = await getRecentOffers(10);
+    // Amazon + AliExpress + Shopee + Mercado Livre = 4 (1 duplicata ignorada)
+    expect(offers.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("estatísticas do banco estão coerentes", async () => {
+    const stats = await getStats();
+    expect(stats.total).toBeGreaterThanOrEqual(4);
+    expect(stats.pending).toBeGreaterThanOrEqual(4); // sem token não publica
+  });
+});
