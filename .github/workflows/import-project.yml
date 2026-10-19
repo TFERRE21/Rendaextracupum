@@ -1,0 +1,49 @@
+name: Importar projeto RendaExtraCupuns
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/import-project.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import-project:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar repositório
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Extrair projeto original
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f RendaExtraCupuns-master.zip
+          mkdir -p /tmp/renda-extra
+          unzip -q RendaExtraCupuns-master.zip -d /tmp/renda-extra
+          test -d /tmp/renda-extra/RendaExtraCupuns-master
+          rsync -a --delete \
+            --exclude='.git/' \
+            --exclude='RendaExtraCupuns-master.zip' \
+            --exclude='SESSAO.txt' \
+            --exclude='.github/workflows/import-project.yml' \
+            /tmp/renda-extra/RendaExtraCupuns-master/ ./
+
+      - name: Publicar arquivos extraídos
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Importar projeto RendaExtraCupuns completo"
+            git push
+          else
+            echo "Nenhuma alteração para publicar."
+          fi
