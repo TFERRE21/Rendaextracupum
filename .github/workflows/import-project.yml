@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/import-project.yml"
+      - "RendaExtraCupuns-master.zip"
   workflow_dispatch:
 
 permissions:
